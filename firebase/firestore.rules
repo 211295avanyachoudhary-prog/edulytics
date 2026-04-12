@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Schools collection
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['name', 'city', 'state', 'board', 'created_by', 'created_at'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 100;
+      allow update: if request.auth != null
+        && (resource.data.created_by == request.auth.uid
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['review_count', 'confidence_level', 'avg_overall']));
+      allow delete: if false;
+    }
+
+    // Reviews collection
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.user_id == request.auth.uid
+        && request.resource.data.keys().hasAll(['user_id', 'school_id', 'ratings', 'timestamp'])
+        && isValidRatings(request.resource.data.ratings)
+        && !hasExistingReview(request.resource.data.school_id, request.auth.uid);
+      allow update: if false;
+      allow delete: if request.auth != null && resource.data.user_id == request.auth.uid;
+    }
+
+    function isValidRatings(ratings) {
+      return ratings.keys().hasAll(['teaching', 'concept_clarity', 'doubt_solving', 'homework', 'pressure'])
+        && ratings.teaching >= 1 && ratings.teaching <= 5
+        && ratings.concept_clarity >= 1 && ratings.concept_clarity <= 5
+        && ratings.doubt_solving >= 1 && ratings.doubt_solving <= 5
+        && ratings.homework >= 1 && ratings.homework <= 5
+        && ratings.pressure >= 1 && ratings.pressure <= 5;
+    }
+
+    function hasExistingReview(schoolId, userId) {
+      return exists(/databases/$(database)/documents/reviews/$(userId + '_' + schoolId));
+    }
+  }
+}
