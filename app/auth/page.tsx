@@ -1,16 +1,11 @@
-export const dynamic = 'force-dynamic'
+import dynamic from 'next/dynamic'
 
-'use client'
-
-import { Suspense } from 'react'
-import AuthPage from './AuthPage'
+const AuthPage = dynamic(() => import('./AuthPage'), {
+  ssr: false,
+})
 
 export default function Page() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <AuthPage />
-    </Suspense>
-  )
+  return <AuthPage />
 }
 
 
