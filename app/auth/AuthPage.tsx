@@ -9,19 +9,23 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function AuthPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  
   const { user } = useAuth()
 const [isSignup, setIsSignup] = useState(false)
-useEffect(() => {
-  const mode = searchParams.get('mode')
-  setIsSignup(mode === 'signup')
-}, [searchParams])
+
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
   const [form, setForm] = useState({ username: '', email: '', password: '' })
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('mode') === 'signup') {
+    setIsSignup(true)
+  }
+}, [])
 
   useEffect(() => {
     if (user) router.replace('/dashboard')
