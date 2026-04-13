@@ -7,5 +7,3 @@ const AuthPage = dynamic(() => import('./AuthPage'), {
 export default function Page() {
   return <AuthPage />
 }
-
-

@@ -9,27 +9,20 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function AuthPage() {
   const router = useRouter()
-  
+  const searchParams = useSearchParams()
   const { user } = useAuth()
-const [isSignup, setIsSignup] = useState(false)
-
+  const [isSignup, setIsSignup] = useState(searchParams.get('mode') === 'signup')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
+  const returnTo = searchParams.get('returnTo') || '/dashboard'
   const [form, setForm] = useState({ username: '', email: '', password: '' })
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search)
-  if (params.get('mode') === 'signup') {
-    setIsSignup(true)
-  }
-}, [])
-
   useEffect(() => {
-    if (user) router.replace('/dashboard')
-  }, [user, router])
+    if (user) router.replace(returnTo)
+  }, [user, router, returnTo])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,10 +32,10 @@ useEffect(() => {
       if (isSignup) {
         await signUp(form.username, form.email, form.password)
         setSuccess(true)
-        setTimeout(() => router.push('/school/select'), 1200)
+        setTimeout(() => router.push(returnTo), 1200)
       } else {
         await signIn(form.email, form.password)
-        router.push('/dashboard')
+        router.push(returnTo)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Authentication failed'

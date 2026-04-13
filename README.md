@@ -244,3 +244,40 @@ npm run build    # Production build
 npm run start    # Production server
 npm run lint     # ESLint
 ```
+
+---
+
+## Onboarding Flow (New — v1.1)
+
+The full 4-step wizard replaces the old single-page onboarding:
+
+| Step | Route | What happens |
+|------|-------|--------------|
+| 1 | `/language` | Pick English or Hindi |
+| 2 | `/onboarding` | Pick role: Student / Parent / Teacher |
+| 3a | `/onboarding/student` | Name, age, gender, grade, school name+address+city+state+board |
+| 3b | `/onboarding/parent` | Parent name, child details, school info, satisfaction level + concerns |
+| 3c | `/onboarding/teacher` | Name, age, gender, subject, experience, school info |
+| 4 | `/onboarding/review-school` | Smart school lookup → inline review form |
+
+### Step 4 Smart Logic
+- **School found in DB** → show school card with rating → offer "Write a Review" or "Just View Profile"
+- **School NOT in DB** → create it automatically → open inline 5-category review form
+- **User already reviewed** → show confirmation state + link to school profile
+- **User not logged in** → redirect to `/auth?returnTo=/onboarding/review-school` → returns to step 4 after signup
+
+### New Files Added
+```
+app/onboarding/
+  layout.tsx              # Dark shell + OnboardingProvider wrapper
+  page.tsx                # Step 2 — Role selection
+  StepShell.tsx           # Shared progress bar + card wrapper
+  FormParts.tsx           # Shared form primitives (Input, Select, Field, ChoiceButton, NextButton)
+  student/page.tsx        # Step 3 — Student info form
+  parent/page.tsx         # Step 3 — Parent/child info + satisfaction form
+  teacher/page.tsx        # Step 3 — Teacher info form
+  review-school/page.tsx  # Step 4 — School lookup + inline review
+
+hooks/useOnboarding.tsx   # Context storing all wizard state across routes
+lib/schoolLookup.ts       # findSchoolByDetails() — exact + prefix Firestore search
+```
