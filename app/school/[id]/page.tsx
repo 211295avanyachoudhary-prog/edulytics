@@ -151,7 +151,7 @@ export default function SchoolProfilePage() {
                 </div>
                 <div className="space-y-4">
                   {categoryKeys.map(({ key, label, icon }) => {
-                    const val = (school as Record<string, unknown>)[key] as number || 0
+                    const val = Number((school as any)[key] )|| 0
                     const pct = (val / 5) * 100
                     const barColor = val >= 4 ? 'bg-emerald-400' : val >= 3 ? 'bg-amber-400' : 'bg-red-400'
                     return (
@@ -326,3 +326,4 @@ export default function SchoolProfilePage() {
     </div>
   )
 }
+
