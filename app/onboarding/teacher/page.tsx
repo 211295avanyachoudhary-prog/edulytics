@@ -1,4 +1,5 @@
 'use client'
+export const dynamic = 'force-dynamic'
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ImagePlus, X } from 'lucide-react'
@@ -18,7 +19,7 @@ export default function TeacherInfoPage() {
   const [previews, setPreviews] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
 
   const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
