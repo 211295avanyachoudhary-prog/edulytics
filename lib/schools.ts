@@ -1,25 +1,17 @@
 import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  serverTimestamp,
-  increment,
-  writeBatch,
+  collection, doc, addDoc, getDoc, getDocs, updateDoc,
+  query, where, orderBy, limit, serverTimestamp, increment,
 } from 'firebase/firestore'
-import { db } from '@/firebase/config'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '@/firebase/config'
 
 export interface School {
   school_id: string
   name: string
+  address: string       // full street address
   city: string
   state: string
+  pincode: string
   board: string
   created_by: string
   confidence_level: 'low' | 'medium' | 'high'
@@ -31,38 +23,53 @@ export interface School {
   avg_doubt_solving: number
   avg_homework: number
   avg_pressure: number
+  weighted_sum: number
+  photos: string[]      // array of download URLs
 }
 
 export interface AddSchoolInput {
   name: string
+  address: string
   city: string
   state: string
+  pincode: string
   board: string
   created_by: string
+  photoFiles?: File[]
 }
 
-const BOARDS = ['CBSE', 'ICSE', 'State Board', 'IB', 'IGCSE', 'Other']
+export const uploadSchoolPhotos = async (schoolId: string, files: File[]): Promise<string[]> => {
+  const urls: string[] = []
+  for (const file of files.slice(0, 5)) {  // max 5 photos
+    const storageRef = ref(storage, `schools/${schoolId}/${Date.now()}_${file.name}`)
+    await uploadBytes(storageRef, file)
+    const url = await getDownloadURL(storageRef)
+    urls.push(url)
+  }
+  return urls
+}
 
 export const addSchool = async (input: AddSchoolInput): Promise<School> => {
-  const { name, city, state, board, created_by } = input
+  const { name, address, city, state, pincode, board, created_by, photoFiles } = input
+  if (!name.trim() || name.trim().length < 3) throw new Error('School name must be at least 3 characters')
+  if (!city.trim() || !state || !board) throw new Error('City, state and board are required')
 
-  if (!name || name.trim().length < 3) throw new Error('School name must be at least 3 characters')
-  if (!city || !state || !board) throw new Error('All fields are required')
-
-  // Check for duplicates
+  // Duplicate check
   const q = query(
     collection(db, 'schools'),
     where('name', '==', name.trim()),
     where('city', '==', city.trim()),
-    where('state', '==', state.trim())
+    where('state', '==', state.trim()),
   )
   const existing = await getDocs(q)
   if (!existing.empty) throw new Error('This school already exists in our database')
 
   const schoolData = {
     name: name.trim(),
+    address: address.trim(),
     city: city.trim(),
     state: state.trim(),
+    pincode: pincode.trim(),
     board,
     created_by,
     confidence_level: 'low' as const,
@@ -74,14 +81,31 @@ export const addSchool = async (input: AddSchoolInput): Promise<School> => {
     avg_doubt_solving: 0,
     avg_homework: 0,
     avg_pressure: 0,
+    weighted_sum: 0,
+    photos: [] as string[],
   }
 
-  const ref = await addDoc(collection(db, 'schools'), schoolData)
+  const docRef = await addDoc(collection(db, 'schools'), schoolData)
 
-  // Increment user's schools_added
+  // Upload photos if provided
+  if (photoFiles && photoFiles.length > 0) {
+    const photoUrls = await uploadSchoolPhotos(docRef.id, photoFiles)
+    await updateDoc(doc(db, 'schools', docRef.id), { photos: photoUrls })
+    schoolData.photos = photoUrls
+  }
+
   await updateDoc(doc(db, 'users', created_by), { schools_added: increment(1) })
+  return { school_id: docRef.id, ...schoolData }
+}
 
-  return { school_id: ref.id, ...schoolData }
+export const addPhotosToSchool = async (schoolId: string, files: File[]): Promise<string[]> => {
+  const urls = await uploadSchoolPhotos(schoolId, files)
+  const schoolRef = doc(db, 'schools', schoolId)
+  const snap = await getDoc(schoolRef)
+  const existing = snap.data()?.photos || []
+  const merged = [...existing, ...urls].slice(0, 10)  // max 10 total
+  await updateDoc(schoolRef, { photos: merged })
+  return merged
 }
 
 export const getSchool = async (schoolId: string): Promise<School | null> => {
@@ -90,24 +114,16 @@ export const getSchool = async (schoolId: string): Promise<School | null> => {
   return { school_id: snap.id, ...snap.data() } as School
 }
 
-export const searchSchools = async (searchTerm: string, sortBy: 'rating' | 'popularity' | 'activity' = 'popularity'): Promise<School[]> => {
-  let q
-
-  if (searchTerm && searchTerm.trim().length > 0) {
-    const term = searchTerm.trim().toLowerCase()
-    // Firestore doesn't support full-text search natively; we use a range query on name
-    q = query(
-      collection(db, 'schools'),
-      orderBy('name'),
-      where('name', '>=', term),
-      where('name', '<=', term + '\uf8ff'),
-      limit(20)
-    )
-  } else {
-    const orderField = sortBy === 'rating' ? 'avg_overall' : 'review_count'
-    q = query(collection(db, 'schools'), orderBy(orderField, 'desc'), limit(20))
-  }
-
+export const searchSchools = async (term: string): Promise<School[]> => {
+  if (!term.trim()) return getAllSchools()
+  const t = term.trim().toLowerCase()
+  const q = query(
+    collection(db, 'schools'),
+    orderBy('name'),
+    where('name', '>=', t),
+    where('name', '<=', t + '\uf8ff'),
+    limit(20),
+  )
   const snap = await getDocs(q)
   return snap.docs.map(d => ({ school_id: d.id, ...d.data() } as School))
 }
@@ -118,11 +134,35 @@ export const getAllSchools = async (): Promise<School[]> => {
   return snap.docs.map(d => ({ school_id: d.id, ...d.data() } as School))
 }
 
-export const getConfidenceLabel = (level: string, count: number): string => {
-  if (count === 0) return 'No reviews yet'
+export const findSchoolByDetails = async (name: string, city: string, state: string): Promise<School | null> => {
+  const exactQ = query(
+    collection(db, 'schools'),
+    where('name', '==', name.trim()),
+    where('city', '==', city.trim()),
+    where('state', '==', state.trim()),
+  )
+  const snap = await getDocs(exactQ)
+  if (!snap.empty) return { school_id: snap.docs[0].id, ...snap.docs[0].data() } as School
+
+  const prefixQ = query(
+    collection(db, 'schools'),
+    orderBy('name'),
+    where('name', '>=', name.trim().toLowerCase()),
+    where('name', '<=', name.trim().toLowerCase() + '\uf8ff'),
+    limit(10),
+  )
+  const pSnap = await getDocs(prefixQ)
+  const match = pSnap.docs.find(d => {
+    const data = d.data()
+    return data.city?.toLowerCase() === city.toLowerCase() && data.state?.toLowerCase() === state.toLowerCase()
+  })
+  if (match) return { school_id: match.id, ...match.data() } as School
+  return null
+}
+
+export const getConfidenceLabel = (count: number): string => {
+  if (count === 0) return 'No reviews'
   if (count < 3) return 'Emerging'
   if (count < 10) return 'Growing'
   return 'Well established'
 }
-
-export { BOARDS }

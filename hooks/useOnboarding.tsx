@@ -4,43 +4,23 @@ import { createContext, useContext, useState, ReactNode } from 'react'
 export type UserRole = 'student' | 'parent' | 'teacher'
 
 export interface StudentInfo {
-  name: string
-  age: string
-  gender: string
-  grade: string
-  schoolName: string
-  schoolAddress: string
-  city: string
-  state: string
-  board: string
+  name: string; age: string; gender: string; grade: string
+  schoolName: string; schoolAddress: string; schoolPincode: string
+  city: string; state: string; board: string
+  photoFiles: File[]
 }
-
 export interface ParentInfo {
-  parentName: string
-  childName: string
-  childAge: string
-  childGender: string
-  grade: string
-  schoolName: string
-  schoolAddress: string
-  city: string
-  state: string
-  board: string
-  happyWithSchool: string
-  concerns: string
+  parentName: string; childName: string; childAge: string; childGender: string; grade: string
+  schoolName: string; schoolAddress: string; schoolPincode: string
+  city: string; state: string; board: string
+  happyWithSchool: string; concerns: string
+  photoFiles: File[]
 }
-
 export interface TeacherInfo {
-  name: string
-  age: string
-  gender: string
-  subject: string
-  schoolName: string
-  schoolAddress: string
-  city: string
-  state: string
-  board: string
-  yearsExperience: string
+  name: string; age: string; gender: string; subject: string; yearsExperience: string
+  schoolName: string; schoolAddress: string; schoolPincode: string
+  city: string; state: string; board: string
+  photoFiles: File[]
 }
 
 export interface OnboardingState {
@@ -51,32 +31,23 @@ export interface OnboardingState {
   resolvedSchoolId: string | null
 }
 
-interface OnboardingContextType {
+interface OnboardingCtx {
   state: OnboardingState
-  setRole: (role: UserRole) => void
-  setStudentInfo: (info: Partial<StudentInfo>) => void
-  setParentInfo: (info: Partial<ParentInfo>) => void
-  setTeacherInfo: (info: Partial<TeacherInfo>) => void
+  setRole: (r: UserRole) => void
+  setStudentInfo: (i: Partial<StudentInfo>) => void
+  setParentInfo: (i: Partial<ParentInfo>) => void
+  setTeacherInfo: (i: Partial<TeacherInfo>) => void
   setResolvedSchoolId: (id: string | null) => void
-  getSchoolDetails: () => { name: string; city: string; state: string; board: string } | null
+  getSchoolDetails: () => { name: string; address: string; city: string; state: string; pincode: string; board: string; photoFiles: File[] } | null
 }
 
-const defaultStudent: StudentInfo = {
-  name: '', age: '', gender: '', grade: '',
-  schoolName: '', schoolAddress: '', city: '', state: '', board: '',
-}
-const defaultParent: ParentInfo = {
-  parentName: '', childName: '', childAge: '', childGender: '', grade: '',
-  schoolName: '', schoolAddress: '', city: '', state: '', board: '',
-  happyWithSchool: '', concerns: '',
-}
-const defaultTeacher: TeacherInfo = {
-  name: '', age: '', gender: '', subject: '',
-  schoolName: '', schoolAddress: '', city: '', state: '', board: '',
-  yearsExperience: '',
-}
+const blank = { photoFiles: [] as File[] }
 
-const OnboardingContext = createContext<OnboardingContextType>({} as OnboardingContextType)
+const defaultStudent: StudentInfo = { name:'', age:'', gender:'', grade:'', schoolName:'', schoolAddress:'', schoolPincode:'', city:'', state:'', board:'', ...blank }
+const defaultParent: ParentInfo   = { parentName:'', childName:'', childAge:'', childGender:'', grade:'', schoolName:'', schoolAddress:'', schoolPincode:'', city:'', state:'', board:'', happyWithSchool:'', concerns:'', ...blank }
+const defaultTeacher: TeacherInfo = { name:'', age:'', gender:'', subject:'', yearsExperience:'', schoolName:'', schoolAddress:'', schoolPincode:'', city:'', state:'', board:'', ...blank }
+
+const Ctx = createContext<OnboardingCtx>({} as OnboardingCtx)
 
 export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<OnboardingState>({
@@ -87,29 +58,21 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     resolvedSchoolId: null,
   })
 
-  const setRole = (role: UserRole) => setState(s => ({ ...s, role }))
-  const setStudentInfo = (info: Partial<StudentInfo>) =>
-    setState(s => ({ ...s, studentInfo: { ...s.studentInfo, ...info } }))
-  const setParentInfo = (info: Partial<ParentInfo>) =>
-    setState(s => ({ ...s, parentInfo: { ...s.parentInfo, ...info } }))
-  const setTeacherInfo = (info: Partial<TeacherInfo>) =>
-    setState(s => ({ ...s, teacherInfo: { ...s.teacherInfo, ...info } }))
-  const setResolvedSchoolId = (id: string | null) =>
-    setState(s => ({ ...s, resolvedSchoolId: id }))
+  const setRole            = (r: UserRole)              => setState(s => ({ ...s, role: r }))
+  const setStudentInfo     = (i: Partial<StudentInfo>)  => setState(s => ({ ...s, studentInfo: { ...s.studentInfo, ...i } }))
+  const setParentInfo      = (i: Partial<ParentInfo>)   => setState(s => ({ ...s, parentInfo:  { ...s.parentInfo,  ...i } }))
+  const setTeacherInfo     = (i: Partial<TeacherInfo>)  => setState(s => ({ ...s, teacherInfo: { ...s.teacherInfo, ...i } }))
+  const setResolvedSchoolId = (id: string | null)       => setState(s => ({ ...s, resolvedSchoolId: id }))
 
   const getSchoolDetails = () => {
-    const { role, studentInfo, parentInfo, teacherInfo } = state
-    if (role === 'student') return { name: studentInfo.schoolName, city: studentInfo.city, state: studentInfo.state, board: studentInfo.board }
-    if (role === 'parent') return { name: parentInfo.schoolName, city: parentInfo.city, state: parentInfo.state, board: parentInfo.board }
-    if (role === 'teacher') return { name: teacherInfo.schoolName, city: teacherInfo.city, state: teacherInfo.state, board: teacherInfo.board }
+    const { role, studentInfo: s, parentInfo: p, teacherInfo: t } = state
+    if (role === 'student') return { name: s.schoolName, address: s.schoolAddress, city: s.city, state: s.state, pincode: s.schoolPincode, board: s.board, photoFiles: s.photoFiles }
+    if (role === 'parent')  return { name: p.schoolName, address: p.schoolAddress, city: p.city, state: p.state, pincode: p.schoolPincode, board: p.board, photoFiles: p.photoFiles }
+    if (role === 'teacher') return { name: t.schoolName, address: t.schoolAddress, city: t.city, state: t.state, pincode: t.schoolPincode, board: t.board, photoFiles: t.photoFiles }
     return null
   }
 
-  return (
-    <OnboardingContext.Provider value={{ state, setRole, setStudentInfo, setParentInfo, setTeacherInfo, setResolvedSchoolId, getSchoolDetails }}>
-      {children}
-    </OnboardingContext.Provider>
-  )
+  return <Ctx.Provider value={{ state, setRole, setStudentInfo, setParentInfo, setTeacherInfo, setResolvedSchoolId, getSchoolDetails }}>{children}</Ctx.Provider>
 }
 
-export const useOnboarding = () => useContext(OnboardingContext)
+export const useOnboarding = () => useContext(Ctx)
